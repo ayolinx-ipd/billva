@@ -29,7 +29,7 @@ sequenceDiagram
 
     BI->>PG: Payment Virtual Account
     PG->>SO: Call settlement information API
-    SO->>SO: Calculate fund allocation
+    SO->>SO: Checking data for payment incoming
     SO-->>PG: Payment response details from SedayuOne
 
     PG-->>BI: Successful payment response
