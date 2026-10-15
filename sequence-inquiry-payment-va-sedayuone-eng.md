@@ -54,11 +54,13 @@ sequenceDiagram
                 BI-->>C: Payment successful
 
             else Payment definitively rejected by SedayuOne
-                AY->>AY: Record the transaction status as failed
+                AY->>AY: Update the transaction status to successful
+                AY->>AY: Update reason with the rejection details from SedayuOne
                 AY-->>BI: Payment failed + reason
                 BI-->>C: Payment successful
             else Retries exhausted and the payment outcome remains uncertain
-                AY->>AY: Record pending status for reconciliation
+                AY->>AY: Update the transaction status to successful
+                AY->>AY: Update reason - retries exhausted, SedayuOne payment outcome unconfirmed
                 AY-->>BI: Payment pending / unconfirmed
                 BI-->>C: Payment successful
             end
@@ -99,7 +101,7 @@ sequenceDiagram
 6. The Bank Issuer calls the Ayolinx payment API. Ayolinx records the payment transaction with processing status and the transaction `billDetails`, then forwards the payment to the SedayuOne API.
 7. If a retryable temporary error occurs, Ayolinx retries the payment call up to three times. Retries stop immediately upon success or a definitive failure.
 8. Once SedayuOne confirms that the payment is successful, Ayolinx updates the transaction status to successful. Ayolinx then returns the successful status to the Bank Issuer, which displays the successful status to the Customer.
-9. If the payment is definitively rejected, Ayolinx records a failed status and returns it with the reason to the Bank Issuer. If all attempts are exhausted but the outcome remains unknown, Ayolinx records and returns a pending status for follow-up through reconciliation. In both cases, the Bank Issuer displays "Payment successful" to the Customer.
+9. If the payment is definitively rejected, Ayolinx updates the transaction status to successful and updates the reason with the rejection details from SedayuOne. Ayolinx returns "Payment failed" with the reason to the Bank Issuer. If all retries are exhausted but the outcome remains unknown, Ayolinx updates the transaction status to successful and updates the reason to indicate that retries are exhausted and the SedayuOne payment outcome is unconfirmed. Ayolinx returns "Payment pending / unconfirmed" to the Bank Issuer for follow-up through reconciliation. In both cases, the Bank Issuer displays "Payment successful" to the Customer.
 10. If the biller code does not belong to SedayuOne, Ayolinx follows its regular VA inquiry process. If the inquiry succeeds, the Bank Issuer proceeds to the payment API and Ayolinx processes the payment through its regular VA flow. The payment result is returned to the Bank Issuer and the Customer. If the inquiry is unsuccessful, payment does not proceed. This branch follows the regular Ayolinx VA mechanism without calling the SedayuOne API.
 
 ## Settlement Process
@@ -115,5 +117,5 @@ After all settlement disbursements have been processed successfully, Ayolinx sen
 - **Attempt count assumption:** one initial call plus up to **three retries**, for a maximum of four payment calls to SedayuOne.
 - Retries apply only to temporary issues, such as timeouts or temporary errors agreed to be retryable. Definitive business rejections are not retried.
 - All retries for the same transaction use the **same reference ID / idempotency key**. SedayuOne must process them idempotently to prevent duplicate payment records.
-- A timeout does not automatically mean the payment failed; SedayuOne may already have processed the transaction. An uncertain outcome is recorded as pending until reconciliation confirms its status.
+- A timeout does not automatically mean the payment failed; SedayuOne may already have processed the transaction. After retries are exhausted, Ayolinx updates the transaction status to successful and records the unconfirmed SedayuOne payment outcome in the reason for reconciliation.
 - Retry intervals, timeout limits, response code mappings, and the reconciliation mechanism follow the integration agreement between Ayolinx and SedayuOne.
