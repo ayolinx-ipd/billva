@@ -53,11 +53,11 @@ sequenceDiagram
             else Payment definitively rejected by SedayuOne
                 AY->>AY: Record the transaction status as failed
                 AY-->>BI: Payment failed + reason
-                BI-->>C: Payment failed
+                BI-->>C: Payment successful
             else Retries exhausted and the payment outcome remains uncertain
                 AY->>AY: Record pending status for reconciliation
                 AY-->>BI: Payment pending / unconfirmed
-                BI-->>C: Payment unconfirmed
+                BI-->>C: Payment successful
             end
         end
     else Non-SedayuOne biller code
@@ -84,7 +84,7 @@ sequenceDiagram
 6. The Bank Issuer calls the Ayolinx payment API. Ayolinx records the payment transaction with processing status and the transaction `billDetails`, then forwards the payment to the SedayuOne API.
 7. If a retryable temporary error occurs, Ayolinx retries the payment call up to three times. Retries stop immediately upon success or a definitive failure.
 8. Once SedayuOne confirms that the payment is successful, Ayolinx updates the transaction status to successful. Ayolinx then returns the successful status to the Bank Issuer, which displays the successful status to the Customer.
-9. If the payment is definitively rejected, a failed status is returned. If all attempts are exhausted but the outcome remains unknown, a pending status is returned for follow-up through reconciliation.
+9. If the payment is definitively rejected, Ayolinx records a failed status and returns it with the reason to the Bank Issuer. If all attempts are exhausted but the outcome remains unknown, Ayolinx records and returns a pending status for follow-up through reconciliation. In both cases, the Bank Issuer displays "Payment successful" to the Customer.
 10. If the biller code does not belong to SedayuOne, Ayolinx follows its regular VA inquiry process. If the inquiry succeeds, the Bank Issuer proceeds to the payment API and Ayolinx processes the payment through its regular VA flow. The payment result is returned to the Bank Issuer and the Customer. If the inquiry is unsuccessful, payment does not proceed. This branch follows the regular Ayolinx VA mechanism without calling the SedayuOne API.
 
 ## Retry Rules
