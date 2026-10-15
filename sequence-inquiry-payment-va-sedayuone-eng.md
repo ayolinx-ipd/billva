@@ -1,4 +1,4 @@
-# SedayuOne VA Inquiry and Payment Sequence Diagram
+# SedayuOne VA Inquiry, Payment, and Settlement Sequence Diagram
 
 ## Actors
 
@@ -6,6 +6,7 @@
 2. **Bank Issuer** — the bank sending inquiry and payment requests to Ayolinx.
 3. **Ayolinx** — checks the biller code, registers the VA, stores `billDetails`, and forwards the payment.
 4. **SedayuOne** — provides VA billing data and processes the payment.
+5. **Settlement Fund Recipient** — receives settlement funds according to the split invoice allocation for each sub-account.
 
 ## Diagram
 
@@ -16,6 +17,7 @@ sequenceDiagram
     participant BI as Bank Issuer
     participant AY as Ayolinx
     participant SO as SedayuOne
+    actor SR as Settlement Fund Recipient
 
     C->>BI: Make a VA payment
     BI->>AY: VA inquiry (VA number)
@@ -50,6 +52,7 @@ sequenceDiagram
                 AY->>AY: Update the transaction status to successful
                 AY-->>BI: Payment successful
                 BI-->>C: Payment successful
+
             else Payment definitively rejected by SedayuOne
                 AY->>AY: Record the transaction status as failed
                 AY-->>BI: Payment failed + reason
@@ -72,6 +75,18 @@ sequenceDiagram
             BI-->>C: Inquiry result, payment does not proceed
         end
     end
+    Note over AY,SR: Settlement process on H+1
+    opt SedayuOne payment confirmed successful
+        AY->>AY: Sum split invoice amounts by sub-account
+        AY->>AY: Deduct applicable fees from each sub-account total
+        loop For each settlement fund recipient
+            AY->>SR: Disburse the net settlement amount for the sub-account
+            SR-->>AY: Confirm receipt of settlement funds
+        end
+        opt All settlement disbursements processed successfully
+            AY->>SO: Callback - settlement disbursement successful
+        end
+    end
 ```
 
 ## Process Flow
@@ -86,6 +101,14 @@ sequenceDiagram
 8. Once SedayuOne confirms that the payment is successful, Ayolinx updates the transaction status to successful. Ayolinx then returns the successful status to the Bank Issuer, which displays the successful status to the Customer.
 9. If the payment is definitively rejected, Ayolinx records a failed status and returns it with the reason to the Bank Issuer. If all attempts are exhausted but the outcome remains unknown, Ayolinx records and returns a pending status for follow-up through reconciliation. In both cases, the Bank Issuer displays "Payment successful" to the Customer.
 10. If the biller code does not belong to SedayuOne, Ayolinx follows its regular VA inquiry process. If the inquiry succeeds, the Bank Issuer proceeds to the payment API and Ayolinx processes the payment through its regular VA flow. The payment result is returned to the Bank Issuer and the Customer. If the inquiry is unsuccessful, payment does not proceed. This branch follows the regular Ayolinx VA mechanism without calling the SedayuOne API.
+
+## Settlement Process
+
+On H+1 (the day after the payment), Ayolinx sums the split invoice amounts for each sub-account and deducts the applicable fees from each sub-account total. Ayolinx then disburses the net settlement amount to each Settlement Fund Recipient, who confirms receipt of the funds.
+
+After all settlement disbursements have been processed successfully, Ayolinx sends one callback to SedayuOne confirming successful settlement disbursement.
+
+**Net settlement amount per sub-account = Total split invoice amount for the sub-account − Applicable fees for the sub-account.**
 
 ## Retry Rules
 
